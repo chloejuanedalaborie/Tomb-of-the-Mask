@@ -1,71 +1,72 @@
 import pyxel
 
-TILE_SIZE = 8
-MAP_WIDTH = 20
-MAP_HEIGHT = 20
+# Configuration
+TAILLE_GRILLE = 32
+TAILLE_CASE = 8
+VITESSE = 2  # Pixels par frame (plus bas = plus lent)
+DISTANCE_LONGUE = 16  # Nombre de cases à parcourir d’un coup
 
-# 1 = mur, 0 = vide
-tile_map = [
-    [1]*MAP_WIDTH
-] + [
-    [1] + [0]* (MAP_WIDTH - 2) + [1]
-    for _ in range(MAP_HEIGHT - 2)
-] + [
-    [1]*MAP_WIDTH
-]
+pyxel.init(TAILLE_GRILLE * TAILLE_CASE, TAILLE_GRILLE * TAILLE_CASE, title="Snake Long Move", fps=1000)
 
-# Ajout de quelques murs internes
-tile_map[5][5] = 1
-tile_map[6][5] = 1
-tile_map[7][5] = 1
-tile_map[10][10] = 1
-tile_map[10][11] = 1
-tile_map[10][12] = 1
-
-player_x = 2
-player_y = 2
-
-def reset():
-    global player_x, player_y
-    player_x = 2
-    player_y = 2
-
-def move(dx, dy):
-    global player_x, player_y
-
-    x = player_x
-    y = player_y
-
-    while True:
-        nx = x + dx
-        ny = y + dy
-        if tile_map[ny][nx] == 1:
-            break
-        x, y = nx, ny
-
-    player_x = x
-    player_y = y
+snake = {
+    "corps": [(5, 5)],  # Position initiale
+    "direction": (1, 0),
+    "en_mouvement": False,
+    "position_pixel": [5 * TAILLE_CASE, 5 * TAILLE_CASE],
+    "animation_step": 0,
+    "cible": (5, 5)
+}
 
 def update():
-    if pyxel.btnp(pyxel.KEY_R):
-        reset()
+    if not snake["en_mouvement"]:
+        # Détection d'une touche et définition de la direction
+        if pyxel.btnp(pyxel.KEY_LEFT):
+            snake["direction"] = (-1, 0)
+        elif pyxel.btnp(pyxel.KEY_RIGHT):
+            snake["direction"] = (1, 0)
+        elif pyxel.btnp(pyxel.KEY_UP):
+            snake["direction"] = (0, -1)
+        elif pyxel.btnp(pyxel.KEY_DOWN):
+            snake["direction"] = (0, 1)
+        else:
+            return
 
-    if pyxel.btnp(pyxel.KEY_RIGHT):
-        move(1, 0)
-    elif pyxel.btnp(pyxel.KEY_LEFT):
-        move(-1, 0)
-    elif pyxel.btnp(pyxel.KEY_UP):
-        move(0, -1)
-    elif pyxel.btnp(pyxel.KEY_DOWN):
-        move(0, 1)
+        # Calcule une cible très loin (jusqu’au bord ou DISTANCE_LONGUE)
+        x, y = snake["corps"][-1]
+        dx, dy = snake["direction"]
+
+        for i in range(1, DISTANCE_LONGUE + 1):
+            nx, ny = x + dx * i, y + dy * i
+            if 0 <= nx < TAILLE_GRILLE and 0 <= ny < TAILLE_GRILLE:
+                pass
+            else:
+                i -= 1  # On s'arrête juste avant de sortir de la grille
+                break
+
+        cible = (x + dx * i, y + dy * i)
+        snake["corps"].append(cible)
+        snake["cible"] = cible
+        snake["animation_step"] = 0
+        snake["en_mouvement"] = True
+
+    else:
+        # Animation : avance vers la cible en pixels
+        dx = snake["direction"][0] * VITESSE
+        dy = snake["direction"][1] * VITESSE
+        snake["position_pixel"][0] += dx
+        snake["position_pixel"][1] += dy
+        snake["animation_step"] += abs(dx + dy)
+
+        if snake["animation_step"] >= TAILLE_CASE * DISTANCE_LONGUE:
+            # Arrivé à la destination
+            snake["en_mouvement"] = False
+            cible = snake["cible"]
+            snake["corps"] = [cible]  # On garde juste la tête
+            snake["position_pixel"] = [cible[0]*TAILLE_CASE, cible[1]*TAILLE_CASE]
 
 def draw():
     pyxel.cls(0)
-    for y in range(MAP_HEIGHT):
-        for x in range(MAP_WIDTH):
-            if tile_map[y][x] == 1:
-                pyxel.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, 3)  # vert
-    pyxel.rect(player_x * TILE_SIZE, player_y * TILE_SIZE, TILE_SIZE, TILE_SIZE, 10)  # jaune
+    x, y = snake["position_pixel"]
+    pyxel.rect(x, y, TAILLE_CASE, TAILLE_CASE, 11)
 
-pyxel.init(MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE, title="Mini Tomb")
 pyxel.run(update, draw)
