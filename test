@@ -1,1 +1,71 @@
 import pyxel
+
+TILE_SIZE = 8
+MAP_WIDTH = 20
+MAP_HEIGHT = 20
+
+# 1 = mur, 0 = vide
+tile_map = [
+    [1]*MAP_WIDTH
+] + [
+    [1] + [0]* (MAP_WIDTH - 2) + [1]
+    for _ in range(MAP_HEIGHT - 2)
+] + [
+    [1]*MAP_WIDTH
+]
+
+# Ajout de quelques murs internes
+tile_map[5][5] = 1
+tile_map[6][5] = 1
+tile_map[7][5] = 1
+tile_map[10][10] = 1
+tile_map[10][11] = 1
+tile_map[10][12] = 1
+
+player_x = 2
+player_y = 2
+
+def reset():
+    global player_x, player_y
+    player_x = 2
+    player_y = 2
+
+def move(dx, dy):
+    global player_x, player_y
+
+    x = player_x
+    y = player_y
+
+    while True:
+        nx = x + dx
+        ny = y + dy
+        if tile_map[ny][nx] == 1:
+            break
+        x, y = nx, ny
+
+    player_x = x
+    player_y = y
+
+def update():
+    if pyxel.btnp(pyxel.KEY_R):
+        reset()
+
+    if pyxel.btnp(pyxel.KEY_RIGHT):
+        move(1, 0)
+    elif pyxel.btnp(pyxel.KEY_LEFT):
+        move(-1, 0)
+    elif pyxel.btnp(pyxel.KEY_UP):
+        move(0, -1)
+    elif pyxel.btnp(pyxel.KEY_DOWN):
+        move(0, 1)
+
+def draw():
+    pyxel.cls(0)
+    for y in range(MAP_HEIGHT):
+        for x in range(MAP_WIDTH):
+            if tile_map[y][x] == 1:
+                pyxel.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, 3)  # vert
+    pyxel.rect(player_x * TILE_SIZE, player_y * TILE_SIZE, TILE_SIZE, TILE_SIZE, 10)  # jaune
+
+pyxel.init(MAP_WIDTH * TILE_SIZE, MAP_HEIGHT * TILE_SIZE, title="Mini Tomb")
+pyxel.run(update, draw)
