@@ -1,25 +1,45 @@
 import pyxel
 
-# Configuration
-TAILLE_GRILLE = 32
+# Configurations
+TAILLE_GRILLE = 16
 TAILLE_CASE = 8
-VITESSE = 2  # Pixels par frame (plus bas = plus lent)
-DISTANCE_LONGUE = 16  # Nombre de cases à parcourir d’un coup
+VITESSE = 2
 
-pyxel.init(TAILLE_GRILLE * TAILLE_CASE, TAILLE_GRILLE * TAILLE_CASE, title="Snake Long Move", fps=1000)
+pyxel.init(TAILLE_GRILLE * TAILLE_CASE, TAILLE_GRILLE * TAILLE_CASE, title="Labyrinthe AutoMove", fps=1000)
 
+# 0 = vide, 1 = mur, 2 = objectif
+labyrinthe = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,1,0,0,0,0,0,1,0,0,2,1],
+    [1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,1],
+    [1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1],
+    [1,0,1,0,1,1,1,1,0,1,1,1,1,1,0,1],
+    [1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1],
+    [1,1,1,0,1,0,1,1,1,1,1,1,0,1,0,1],
+    [1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1],
+    [1,0,1,1,1,1,1,0,1,1,0,1,1,1,0,1],
+    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+]
+
+# Snake
 snake = {
-    "corps": [(5, 5)],  # Position initiale
-    "direction": (1, 0),
+    "direction": (0, 0),
     "en_mouvement": False,
-    "position_pixel": [5 * TAILLE_CASE, 5 * TAILLE_CASE],
-    "animation_step": 0,
-    "cible": (5, 5)
+    "position_case": [1, 1],
+    "position_pixel": [1 * TAILLE_CASE, 1 * TAILLE_CASE],
+    "cible": [1, 1],
+    "animation_step": 0
 }
+
+def case_est_libre(x, y):
+    return 0 <= x < TAILLE_GRILLE and 0 <= y < len(labyrinthe) and labyrinthe[y][x] != 1
+
+def case_est_cible(x, y):
+    return labyrinthe[y][x] == 2
 
 def update():
     if not snake["en_mouvement"]:
-        # Détection d'une touche et définition de la direction
         if pyxel.btnp(pyxel.KEY_LEFT):
             snake["direction"] = (-1, 0)
         elif pyxel.btnp(pyxel.KEY_RIGHT):
@@ -31,42 +51,51 @@ def update():
         else:
             return
 
-        # Calcule une cible très loin (jusqu’au bord ou DISTANCE_LONGUE)
-        x, y = snake["corps"][-1]
+        # Avancer jusqu'au prochain mur ou case cible
+        x, y = snake["position_case"]
         dx, dy = snake["direction"]
 
-        for i in range(1, DISTANCE_LONGUE + 1):
-            nx, ny = x + dx * i, y + dy * i
-            if 0 <= nx < TAILLE_GRILLE and 0 <= ny < TAILLE_GRILLE:
-                pass
+        while True:
+            nx, ny = x + dx, y + dy
+            if case_est_libre(nx, ny):
+                x, y = nx, ny
+                if case_est_cible(x, y):
+                    break  # s'arrête dès qu'on atteint la cible
             else:
-                i -= 1  # On s'arrête juste avant de sortir de la grille
                 break
 
-        cible = (x + dx * i, y + dy * i)
-        snake["corps"].append(cible)
-        snake["cible"] = cible
-        snake["animation_step"] = 0
+        snake["cible"] = [x, y]
         snake["en_mouvement"] = True
+        snake["animation_step"] = 0
 
     else:
-        # Animation : avance vers la cible en pixels
         dx = snake["direction"][0] * VITESSE
         dy = snake["direction"][1] * VITESSE
         snake["position_pixel"][0] += dx
         snake["position_pixel"][1] += dy
         snake["animation_step"] += abs(dx + dy)
 
-        if snake["animation_step"] >= TAILLE_CASE * DISTANCE_LONGUE:
-            # Arrivé à la destination
+        cx, cy = snake["cible"]
+        cible_px = [cx * TAILLE_CASE, cy * TAILLE_CASE]
+
+        if snake["position_pixel"] == cible_px:
             snake["en_mouvement"] = False
-            cible = snake["cible"]
-            snake["corps"] = [cible]  # On garde juste la tête
-            snake["position_pixel"] = [cible[0]*TAILLE_CASE, cible[1]*TAILLE_CASE]
+            snake["position_case"] = [cx, cy]
 
 def draw():
     pyxel.cls(0)
+
+    # Dessine labyrinthe
+    for y in range(len(labyrinthe)):
+        for x in range(TAILLE_GRILLE):
+            if labyrinthe[y][x] == 1:
+                pyxel.rect(x * TAILLE_CASE, y * TAILLE_CASE, TAILLE_CASE, TAILLE_CASE, 5)
+            elif labyrinthe[y][x] == 2:
+                pyxel.rect(x * TAILLE_CASE, y * TAILLE_CASE, TAILLE_CASE, TAILLE_CASE, 11)  # vert clair (objectif)
+
+    # Dessine le carré
     x, y = snake["position_pixel"]
-    pyxel.rect(x, y, TAILLE_CASE, TAILLE_CASE, 11)
+    pyxel.rect(x, y, TAILLE_CASE, TAILLE_CASE, 10)  # jaune
 
 pyxel.run(update, draw)
+
