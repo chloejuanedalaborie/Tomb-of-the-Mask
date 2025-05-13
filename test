@@ -1,101 +1,120 @@
 import pyxel
 
-# Configurations
-TAILLE_GRILLE = 16
-TAILLE_CASE = 8
-VITESSE = 2
+# Paramètres du labyrinthe
+TAILLE_CASE = 4
+GRILLE_LARGEUR = 40
+GRILLE_HAUTEUR = 30
 
-pyxel.init(TAILLE_GRILLE * TAILLE_CASE, TAILLE_GRILLE * TAILLE_CASE, title="Labyrinthe AutoMove", fps=1000)
+pyxel.init(GRILLE_LARGEUR * TAILLE_CASE, GRILLE_HAUTEUR * TAILLE_CASE, title="Déplacement auto intelligent", fps=60)
 
-# 0 = vide, 1 = mur, 2 = objectif
+# 0 = vide, 1 = mur
 labyrinthe = [
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,1,0,0,0,0,0,1,0,0,2,1],
-    [1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,1],
-    [1,0,1,0,0,0,0,1,0,0,0,1,0,0,0,1],
-    [1,0,1,0,1,1,1,1,0,1,1,1,1,1,0,1],
-    [1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1],
-    [1,1,1,0,1,0,1,1,1,1,1,1,0,1,0,1],
-    [1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1],
-    [1,0,1,1,1,1,1,0,1,1,0,1,1,1,0,1],
-    [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1]*40,
+    [1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,1],
+    [1,0,1,1,1,1,0,1,1,1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,0,1,0,1,0,1,1,0,1,1,1,1,1,1,0,1],
+    [1,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,1,0,0,0,0,0,0,1,0,1],
+    [1,0,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1],
+    [1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1]*40,
 ]
 
-# Snake
+# Complétons la hauteur manquante
+while len(labyrinthe) < GRILLE_HAUTEUR:
+    labyrinthe.append([1]*GRILLE_LARGEUR)
+
+# Position et direction initiales
 snake = {
-    "direction": (0, 0),
-    "en_mouvement": False,
-    "position_case": [1, 1],
-    "position_pixel": [1 * TAILLE_CASE, 1 * TAILLE_CASE],
-    "cible": [1, 1],
-    "animation_step": 0
+    "x": 1 * TAILLE_CASE,
+    "y": 1 * TAILLE_CASE,
+    "dx": 0,
+    "dy": 0,
+    "couleur": 10
 }
 
-def case_est_libre(x, y):
-    return 0 <= x < TAILLE_GRILLE and 0 <= y < len(labyrinthe) and labyrinthe[y][x] != 1
+def est_case_libre(x, y):
+    # Vérifie que les 4 coins du carré sont dans des cases libres
+    positions = [
+        (x, y),
+        (x + TAILLE_CASE - 1, y),
+        (x, y + TAILLE_CASE - 1),
+        (x + TAILLE_CASE - 1, y + TAILLE_CASE - 1)
+    ]
+    for px, py in positions:
+        gx = px // TAILLE_CASE
+        gy = py // TAILLE_CASE
+        if not (0 <= gx < GRILLE_LARGEUR and 0 <= gy < GRILLE_HAUTEUR):
+            return False
+        if labyrinthe[gy][gx] != 0:
+            return False
+    return True
 
-def case_est_cible(x, y):
-    return labyrinthe[y][x] == 2
+
+def est_intersection(x, y):
+    gx = x // TAILLE_CASE
+    gy = y // TAILLE_CASE
+    directions_libres = 0
+    for dx, dy in [(-1,0), (1,0), (0,-1), (0,1)]:
+        nx = gx + dx
+        ny = gy + dy
+        if 0 <= nx < GRILLE_LARGEUR and 0 <= ny < GRILLE_HAUTEUR:
+            if labyrinthe[ny][nx] == 0:
+                directions_libres += 1
+    return directions_libres >= 3  # Plus de 2 choix possibles
+
+def aligné_sur_grille(x, y):
+    return x % TAILLE_CASE == 0 and y % TAILLE_CASE == 0
 
 def update():
-    if not snake["en_mouvement"]:
-        if pyxel.btnp(pyxel.KEY_LEFT):
-            snake["direction"] = (-1, 0)
-        elif pyxel.btnp(pyxel.KEY_RIGHT):
-            snake["direction"] = (1, 0)
-        elif pyxel.btnp(pyxel.KEY_UP):
-            snake["direction"] = (0, -1)
-        elif pyxel.btnp(pyxel.KEY_DOWN):
-            snake["direction"] = (0, 1)
+    global snake
+
+    if aligné_sur_grille(snake["x"], snake["y"]):
+        # Si le joueur est aligné sur la grille, on vérifie les touches
+        if snake["dx"] == 0 and snake["dy"] == 0:
+            # Le joueur est arrêté, on attend une direction
+            if pyxel.btnp(pyxel.KEY_RIGHT):
+                if est_case_libre(snake["x"] + TAILLE_CASE, snake["y"]):
+                    snake["dx"], snake["dy"] = TAILLE_CASE // 4, 0
+            elif pyxel.btnp(pyxel.KEY_LEFT):
+                if est_case_libre(snake["x"] - TAILLE_CASE, snake["y"]):
+                    snake["dx"], snake["dy"] = -TAILLE_CASE // 4, 0
+            elif pyxel.btnp(pyxel.KEY_DOWN):
+                if est_case_libre(snake["x"], snake["y"] + TAILLE_CASE):
+                    snake["dx"], snake["dy"] = 0, TAILLE_CASE // 4
+            elif pyxel.btnp(pyxel.KEY_UP):
+                if est_case_libre(snake["x"], snake["y"] - TAILLE_CASE):
+                    snake["dx"], snake["dy"] = 0, -TAILLE_CASE // 4
         else:
-            return
+            # Il avance, mais on vérifie s'il faut s'arrêter
+            next_x = snake["x"] + snake["dx"]
+            next_y = snake["y"] + snake["dy"]
+            if not est_case_libre(next_x, next_y) or est_intersection(snake["x"], snake["y"]):
+                snake["dx"], snake["dy"] = 0, 0
 
-        # Avancer jusqu'au prochain mur ou case cible
-        x, y = snake["position_case"]
-        dx, dy = snake["direction"]
+    # Déplacement si possible
+    # Prochaine position
+    next_x = snake["x"] + snake["dx"]
+    next_y = snake["y"] + snake["dy"]
 
-        while True:
-            nx, ny = x + dx, y + dy
-            if case_est_libre(nx, ny):
-                x, y = nx, ny
-                if case_est_cible(x, y):
-                    break  # s'arrête dès qu'on atteint la cible
-            else:
-                break
-
-        snake["cible"] = [x, y]
-        snake["en_mouvement"] = True
-        snake["animation_step"] = 0
-
+    if est_case_libre(next_x, next_y):
+        snake["x"] = next_x
+        snake["y"] = next_y
     else:
-        dx = snake["direction"][0] * VITESSE
-        dy = snake["direction"][1] * VITESSE
-        snake["position_pixel"][0] += dx
-        snake["position_pixel"][1] += dy
-        snake["animation_step"] += abs(dx + dy)
+        snake["dx"], snake["dy"] = 0, 0
 
-        cx, cy = snake["cible"]
-        cible_px = [cx * TAILLE_CASE, cy * TAILLE_CASE]
-
-        if snake["position_pixel"] == cible_px:
-            snake["en_mouvement"] = False
-            snake["position_case"] = [cx, cy]
 
 def draw():
     pyxel.cls(0)
 
-    # Dessine labyrinthe
-    for y in range(len(labyrinthe)):
-        for x in range(TAILLE_GRILLE):
+    # Affichage du labyrinthe
+    for y in range(GRILLE_HAUTEUR):
+        for x in range(GRILLE_LARGEUR):
             if labyrinthe[y][x] == 1:
                 pyxel.rect(x * TAILLE_CASE, y * TAILLE_CASE, TAILLE_CASE, TAILLE_CASE, 5)
-            elif labyrinthe[y][x] == 2:
-                pyxel.rect(x * TAILLE_CASE, y * TAILLE_CASE, TAILLE_CASE, TAILLE_CASE, 11)  # vert clair (objectif)
 
-    # Dessine le carré
-    x, y = snake["position_pixel"]
-    pyxel.rect(x, y, TAILLE_CASE, TAILLE_CASE, 10)  # jaune
+    # Affichage du carré
+    pyxel.rect(snake["x"], snake["y"], TAILLE_CASE, TAILLE_CASE, snake["couleur"])
 
 pyxel.run(update, draw)
 
